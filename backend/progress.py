@@ -1,8 +1,6 @@
-"""Progress + social layer (in-memory demo state).
+"""Quiz progress (in-memory demo state).
 
-- ``POST /api/progress/{user}/xp``   award XP
-- ``GET  /api/progress/{user}``      profile: XP, streak, badges, subject levels
-- ``GET  /api/leaderboard?friends=a,b`` private friend leaderboard
+- ``GET /api/progress/{user}``  profile: XP, streak, badges, subject levels
 
 Subject levels: every user has a rank per subject (Beginner -> Expert)
 based on the points earned in quizzes on that subject, see :func:`add_points`.
@@ -81,16 +79,6 @@ def add_points(user: str, subject: str, points: int) -> dict:
     return {**level, "ranked_up": level["rank"] != rank_before}
 
 
-@router.post("/progress/{user}/xp")
-def award_xp(user: str, amount: int) -> dict:
-    """Award XP, advance streak, and mint any new badges."""
-    _touch(user)
-    profile = _STATE[user]
-    profile["xp"] += amount
-    badges = [b for tier, b in sorted(_BADGES.items()) if profile["xp"] >= tier]
-    return {"user": user, "xp": profile["xp"], "streak": profile["streak"], "badges": badges}
-
-
 @router.get("/progress/{user}")
 def get_progress(user: str) -> dict:
     """Return the user's progress profile."""
@@ -103,15 +91,3 @@ def get_progress(user: str) -> dict:
         reverse=True,
     )
     return {"user": user, **profile, "badges": badges, "subjects": subjects}
-
-
-@router.get("/leaderboard")
-def leaderboard(friends: str = "") -> dict:
-    """Private friend leaderboard. ``?friends=alice,bob`` (or none = everyone)."""
-    ids = [f.strip() for f in friends.split(",") if f.strip()] if friends else list(_STATE)
-    rows = sorted(
-        ((uid, p["xp"]) for uid, p in _STATE.items() if uid in ids),
-        key=lambda r: r[1],
-        reverse=True,
-    )
-    return {"friends": ids, "ranking": [{"user": uid, "xp": xp} for uid, xp in rows]}

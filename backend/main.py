@@ -25,14 +25,11 @@ from fastapi.responses import FileResponse, JSONResponse
 import demo
 import helper
 import limits
-from bootcamp import router as bootcamp_router
 from challenges import router as challenges_router
-from checkpoint import router as checkpoint_router
-from config import DEMO
+from config import DEMO, VISITOR_IP_HEADER
 from expertise import router as expertise_router
 from lecture import router as lecture_router
 from peer_review import router as peer_review_router
-from placement import router as placement_router
 from progress import router as progress_router
 
 app = FastAPI(
@@ -46,9 +43,6 @@ app = FastAPI(
 )
 
 app.include_router(lecture_router)
-app.include_router(placement_router)
-app.include_router(bootcamp_router)
-app.include_router(checkpoint_router)
 app.include_router(progress_router)
 app.include_router(challenges_router)
 app.include_router(expertise_router)
@@ -57,15 +51,42 @@ app.include_router(peer_review_router)
 if DEMO:
     demo.seed()
 
+# Browser protections on every response. The policy allows the frontend's own files and the
+# Inter font from Google Fonts. The API docs pages load their viewer from a CDN, so they go
+# without it.
+SECURITY_HEADERS = {
+    "Strict-Transport-Security": "max-age=31536000",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; style-src 'self' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; "
+    "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+API_DOCS_PAGES = {app.docs_url, app.redoc_url, app.swagger_ui_oauth2_redirect_url}
+
 
 @app.middleware("http")
 async def remember_visitor(request: Request, call_next):
     """Charge the AI calls this request makes to the visitor's IP address (see limits.py)."""
-    token = limits.visitor.set(request.client.host if request.client else "unknown")
+    ip = request.headers.get(VISITOR_IP_HEADER) if VISITOR_IP_HEADER else None
+    token = limits.visitor.set(ip or (request.client.host if request.client else "unknown"))
     try:
         return await call_next(request)
     finally:
         limits.visitor.reset(token)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.update(SECURITY_HEADERS)
+    if request.url.path not in API_DOCS_PAGES:
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    return response
 
 
 @app.exception_handler(limits.TooManyCalls)
@@ -95,7 +116,7 @@ def health() -> dict:
 
 if FRONTEND_DIST.is_dir():
 
-    @app.get("/{path:path}", include_in_schema=False)
+    @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
     def frontend(path: str) -> FileResponse:
         """The built frontend. Every page is index.html: the app picks the page from the URL."""
         if path.startswith("api/"):

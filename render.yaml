@@ -13,3 +13,7 @@ services:
       # brings back the example Peer Reviewer and help requests on every start.
       - key: DEMO
         value: "1"
+      # Render's proxy always sets True-Client-IP to the visitor's real IP, so the AI limits
+      # can't be dodged by sending a made-up X-Forwarded-For header.
+      - key: VISITOR_IP_HEADER
+        value: True-Client-IP

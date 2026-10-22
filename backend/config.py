@@ -28,6 +28,10 @@ MAX_UPLOAD_CHARS: int = int(os.getenv("MAX_UPLOAD_CHARS", "20000"))
 MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "20"))
 
 # AI calls one visitor (by IP address) may make, so a public demo's free quota is shared.
+# VISITOR_IP_HEADER names the header in which the host's proxy puts the visitor's real IP
+# (True-Client-IP on Render, see render.yaml). Never use X-Forwarded-For: visitors can add
+# their own entries to it. When empty, the connecting address is used, as in local runs.
+VISITOR_IP_HEADER: str = os.getenv("VISITOR_IP_HEADER", "")
 VISITOR_AI_CALLS_PER_MINUTE: int = int(os.getenv("VISITOR_AI_CALLS_PER_MINUTE", "8"))
 VISITOR_AI_CALLS_PER_DAY: int = int(os.getenv("VISITOR_AI_CALLS_PER_DAY", "60"))
 
