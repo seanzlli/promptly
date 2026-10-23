@@ -114,12 +114,6 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/api/visitor", include_in_schema=False)
-def visitor() -> dict:
-    """Temporary: the IP the AI limits charge this request to, to check Render's header."""
-    return {"ip": limits.visitor.get()}
-
-
 if FRONTEND_DIST.is_dir():
 
     @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
